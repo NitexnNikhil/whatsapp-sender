@@ -1,3 +1,4 @@
+
 import re
 import csv
 import urllib.parse
@@ -21,6 +22,18 @@ def extract_numbers(filepath):
         if re.match(r'^\+\d{10,15}$', n):
             cleaned.append(n)
     return cleaned
+
+def remove_duplicates(numbers):
+    seen = set()
+    unique = []
+    duplicates = []
+    for num in numbers:
+        if num in seen:
+            duplicates.append(num)
+        else:
+            seen.add(num)
+            unique.append(num)
+    return unique, duplicates
 
 def save_csv(numbers, message, filepath):
     encoded = urllib.parse.quote(message)
@@ -75,21 +88,32 @@ numbers = extract_numbers(INPUT_FILE)
 if not numbers:
     print("❌ No valid phone numbers found in input.txt")
 else:
+    # ── Duplicate check ───────────────────────
+    unique_numbers, duplicate_numbers = remove_duplicates(numbers)
+
     print("=" * 55)
     print("  WhatsApp Desktop Auto-Sender")
     print("=" * 55)
-    print(f"  ✅ Numbers found: {len(numbers)}")
-    for n in numbers:
+    print(f"  ✅ Numbers found   : {len(numbers)}")
+    print(f"  ✅ Unique numbers  : {len(unique_numbers)}")
+
+    if duplicate_numbers:
+        print(f"  ⚠️  Duplicates skipped: {len(duplicate_numbers)}")
+        for d in duplicate_numbers:
+            print(f"     🔁 {d}")
+    else:
+        print("  ✅ No duplicates found")
+
+    print("\n  Numbers to process:")
+    for n in unique_numbers:
         print(f"     {n}")
     print("=" * 55)
     print()
+
     MESSAGE = input("✏️  Type your message and press ENTER:\n> ").strip()
 
     if not MESSAGE:
         print("❌ No message entered. Exiting.")
     else:
-        save_csv(numbers, MESSAGE, OUTPUT_FILE)
-        send_messages(numbers, MESSAGE)
-
-
-
+        save_csv(unique_numbers, MESSAGE, OUTPUT_FILE)   # only unique numbers saved
+        send_messages(unique_numbers, MESSAGE)
