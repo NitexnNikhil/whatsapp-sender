@@ -65,7 +65,7 @@ console.log([...numbers].join("\n"));
             }
         });
 
-        console.log(`Current Count: ${allNumbers.size} / 1024`);
+        console.log(`Current Count: ${allNumbers.size}`);
 
         // 2. Perform the scroll
         scrollContainer.scrollBy(0, 800);
