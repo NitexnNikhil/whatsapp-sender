@@ -92,9 +92,6 @@ console.log([...numbers].join("\n"));
 ```
 ### With the copy command in the console
 ```bash
-
-
-﻿
 (async () => {
     console.log("🚀 Starting Aggressive Full Export...");
     const allNumbers = new Set();
