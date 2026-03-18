@@ -4,21 +4,72 @@
 
 
 ## Now click on inspect and in the console *** Follow this below command ***
+### With the copy command in the console
 ```bash
-// Extract phone numbers from WhatsApp Web group member list
-let numbers = new Set();
+(async () => {
+    console.log("🚀 Starting Aggressive Full Export...");
+    const allNumbers = new Set();
+    
+    const findScrollable = () => {
+        const divs = document.querySelectorAll('div');
+        return Array.from(divs).find(el => el.scrollHeight > el.clientHeight && 
+                                           window.getComputedStyle(el).overflowY !== 'hidden');
+    };
 
-// Find all span elements
-document.querySelectorAll("span").forEach(span => {
-    let text = span.innerText;
-    if (text && text.match(/\+\d+/)) {
-        numbers.add(text.trim());
-    }
-});
+    const scrollContainer = findScrollable() || document.querySelector('div[tabindex="-1"]');
+    if (!scrollContainer) return console.error("❌ Sidebar not found!");
 
-console.log("Extracted Numbers:");
-console.log([...numbers].join("\n"));
+    let lastCount = 0;
+    let stopCount = 0;
+
+    while (stopCount < 10) { 
+        document.querySelectorAll('span[title], div[aria-label], span[dir="auto"]').forEach(el => {
+            const val = el.getAttribute('title') || el.getAttribute('aria-label') || el.innerText;
+            if (val) {
+                const matches = val.match(/\+?\d[\d\s-]{9,15}/g);
+                if (matches) matches.forEach(num => {
+                    const clean = num.replace(/[\s-]/g, '');
+                    if (clean.length >= 10 && clean.length <= 13) allNumbers.add(clean);
+                });
+            }
+        });
+
+        console.log(`Current Count: ${allNumbers.size}`);
+        scrollContainer.scrollBy(0, 800);
+        await new Promise(r => setTimeout(r, 1000));
+
+        if (allNumbers.size === lastCount) {
+            stopCount++;
+            scrollContainer.scrollBy(0, -50); 
+        } else {
+            stopCount = 0;
+            lastCount = allNumbers.size;
+        }
+    }
+
+    const finalResult = Array.from(allNumbers).join('\n');
+    
+    // --- UI BUTTON FALLBACK ---
+    const btn = document.createElement('button');
+    btn.innerText = `✅ Extraction Done! Click to Copy ${allNumbers.size} Numbers`;
+    btn.style = "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:20px;background:#25D366;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.3);";
+    
+    btn.onclick = async () => {
+        await navigator.clipboard.writeText(finalResult);
+        btn.innerText = "📋 COPIED TO CLIPBOARD!";
+        btn.style.background = "#075E54";
+        setTimeout(() => btn.remove(), 3000);
+    };
+    
+    document.body.appendChild(btn);
+    console.log("👆 Click the green button at the top of your screen to copy!");
+})();
 ```
+
+
+
+
+
 
 
 
@@ -90,67 +141,7 @@ console.log([...numbers].join("\n"));
     console.log("📋 Copied to clipboard!");
 })();
 ```
-### With the copy command in the console
-```bash
-(async () => {
-    console.log("🚀 Starting Aggressive Full Export...");
-    const allNumbers = new Set();
-    
-    const findScrollable = () => {
-        const divs = document.querySelectorAll('div');
-        return Array.from(divs).find(el => el.scrollHeight > el.clientHeight && 
-                                           window.getComputedStyle(el).overflowY !== 'hidden');
-    };
 
-    const scrollContainer = findScrollable() || document.querySelector('div[tabindex="-1"]');
-    if (!scrollContainer) return console.error("❌ Sidebar not found!");
-
-    let lastCount = 0;
-    let stopCount = 0;
-
-    while (stopCount < 10) { 
-        document.querySelectorAll('span[title], div[aria-label], span[dir="auto"]').forEach(el => {
-            const val = el.getAttribute('title') || el.getAttribute('aria-label') || el.innerText;
-            if (val) {
-                const matches = val.match(/\+?\d[\d\s-]{9,15}/g);
-                if (matches) matches.forEach(num => {
-                    const clean = num.replace(/[\s-]/g, '');
-                    if (clean.length >= 10 && clean.length <= 13) allNumbers.add(clean);
-                });
-            }
-        });
-
-        console.log(`Current Count: ${allNumbers.size}`);
-        scrollContainer.scrollBy(0, 800);
-        await new Promise(r => setTimeout(r, 1000));
-
-        if (allNumbers.size === lastCount) {
-            stopCount++;
-            scrollContainer.scrollBy(0, -50); 
-        } else {
-            stopCount = 0;
-            lastCount = allNumbers.size;
-        }
-    }
-
-    const finalResult = Array.from(allNumbers).join('\n');
-    
-    // --- UI BUTTON FALLBACK ---
-    const btn = document.createElement('button');
-    btn.innerText = `✅ Extraction Done! Click to Copy ${allNumbers.size} Numbers`;
-    btn.style = "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;padding:20px;background:#25D366;color:white;border:none;border-radius:10px;cursor:pointer;font-weight:bold;box-shadow:0 4px 15px rgba(0,0,0,0.3);";
-    
-    btn.onclick = async () => {
-        await navigator.clipboard.writeText(finalResult);
-        btn.innerText = "📋 COPIED TO CLIPBOARD!";
-        btn.style.background = "#075E54";
-        setTimeout(() => btn.remove(), 3000);
-    };
-    
-    document.body.appendChild(btn);
-    console.log("👆 Click the green button at the top of your screen to copy!");
-})();
-```
 
 
 # WhatsApp Anti-Abuse & Bulk Messaging Guide (Personal Accounts)
