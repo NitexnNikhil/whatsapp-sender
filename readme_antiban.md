@@ -4,6 +4,13 @@ A Python-based semi-automated messaging utility designed to minimize account ris
 
 ---
 
+
+### To run the Antiban Script
+```bash
+python3 whatsapp_antiban_send.py   
+```
+
+
 ## 📖 How It Works (Anti-Ban Strategy)
 
 Unlike standard "loops" that trigger a ban within minutes, this script operates on a **Human Mimicry Framework**. It uses four specific layers of protection:
