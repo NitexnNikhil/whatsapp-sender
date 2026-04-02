@@ -7,30 +7,59 @@ import sys
 import os
 import random
 
-# ──────────────────────────────────────────────────────────────────────────
-# CONFIGURATION & ANTI-BAN SETTINGS
-# ──────────────────────────────────────────────────────────────────────────
-INPUT_FILE        = "input.txt"
-OUTPUT_FILE       = "output_log.csv"
+# --------------------------------------------------------------------------
+# CONFIGURATION
+# --------------------------------------------------------------------------
+INPUT_FILE         = "input.txt"
+MESSAGE_FILE       = "message.md"
+SENT_REGISTRY_FILE = "sent_numbers.txt"
 
-# Anti-Abuse Parameters (2026 Standards)
-BATCH_SIZE        = 15           # Pause after every 15 messages
-LONG_BREAK_MIN    = 5            # Length of the batch pause (minutes)
-SHORT_DELAY_RANGE = (8, 18)      # Human-mimicry delay between messages (seconds)
+# Anti-Ban Constants (High Safety)
+BATCH_SIZE         = 10            # Messages per batch
+LONG_BREAK_MIN     = 60            # Minutes to wait after a batch
+SHORT_DELAY_RANGE  = (280, 320)    # ~5 minute delay between messages
 
 GREETINGS = ["Hi", "Hello", "Hey there", "Greetings", "Hey", "Hi there"]
 
-# ──────────────────────────────────────────────────────────────────────────
-# CORE FUNCTIONS
-# ──────────────────────────────────────────────────────────────────────────
+# --------------------------------------------------------------------------
+# DATA PERSISTENCE FUNCTIONS
+# --------------------------------------------------------------------------
+
+def get_already_sent():
+    """Load history of sent numbers to avoid duplicates."""
+    if not os.path.exists(SENT_REGISTRY_FILE):
+        return set()
+    with open(SENT_REGISTRY_FILE, "r", encoding="utf-8") as f:
+        return set(line.strip() for line in f if line.strip())
+
+def mark_as_sent(number):
+    """Log a number to the registry immediately after triggering."""
+    with open(SENT_REGISTRY_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{number}\n")
+
+def get_random_message_variant(filepath):
+    """Reads all lines from message.md and returns one random variant."""
+    if not os.path.exists(filepath):
+        return "Hi, this is Nikhil from Bootcoding."
+    with open(filepath, "r", encoding="utf-8") as f:
+        # Filter out empty lines and strip whitespace
+        variants = [line.strip() for line in f if line.strip()]
+    
+    if not variants:
+        return "Hi, this is Nikhil from Bootcoding."
+    
+    return random.choice(variants)
+
+# --------------------------------------------------------------------------
+# PROCESSING FUNCTIONS
+# --------------------------------------------------------------------------
 
 def extract_numbers(filepath):
-    """Finds phone numbers with international format in the input file."""
+    """Extract and clean international format numbers."""
     if not os.path.exists(filepath):
         return []
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
-    # Matches + followed by 10-15 digits, allowing for spaces/dashes
     raw = re.findall(r'\+[\d\s\-]{7,20}', content)
     cleaned = []
     for num in raw:
@@ -39,42 +68,8 @@ def extract_numbers(filepath):
             cleaned.append(n)
     return cleaned
 
-def remove_duplicates(numbers):
-    """Filters out duplicate numbers while preserving order."""
-    seen = set()
-    unique = []
-    duplicates = []
-    for num in numbers:
-        if num in seen:
-            duplicates.append(num)
-        else:
-            seen.add(num)
-            unique.append(num)
-    return unique, duplicates
-
-def get_random_message(base_message):
-    """Prefixes message with a random greeting to bypass simple pattern hashing."""
-    return f"{random.choice(GREETINGS)}! {base_message}"
-
-def smart_delay():
-    """Simulates the time a human takes to read, paste, and click."""
-    delay = random.uniform(*SHORT_DELAY_RANGE)
-    print(f"   ⏳ Human-mimicry delay: {delay:.2f}s...")
-    time.sleep(delay)
-
-def save_log(numbers, message, filepath):
-    """Saves a record of the numbers and the generated URLs."""
-    encoded_base = urllib.parse.quote(message)
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Phone Number", "Original Message", "WhatsApp URL"])
-        for num in numbers:
-            url = f"https://wa.me/{num.lstrip('+')}?text={encoded_base}"
-            writer.writerow([num, message, url])
-    print(f"\n Log saved: {filepath}\n")
-
 def open_whatsapp_desktop(number, custom_message):
-    """Triggers the OS to open the WhatsApp Desktop application."""
+    """Trigger the system to open WhatsApp Desktop with the message."""
     encoded = urllib.parse.quote(custom_message)
     whatsapp_url = f"whatsapp://send?phone={number.lstrip('+')}&text={encoded}"
     try:
@@ -86,66 +81,57 @@ def open_whatsapp_desktop(number, custom_message):
             subprocess.Popen(["xdg-open", whatsapp_url])
         return True
     except Exception as e:
-        print(f"Error triggering WhatsApp app: {e}")
+        print(f"System Error: {e}")
         return False
 
-def send_messages_smart(numbers, message):
-    """Main loop with batching and randomized delays."""
-    total = len(numbers)
-    print(f"\n🚀 Starting Smart Sender | Total: {total} numbers")
-    print("Ensure WhatsApp Desktop is OPEN and LOGGED IN.")
-    input("Press ENTER to begin...")
+def run_sender():
+    # 1. Load Data
+    raw_list = extract_numbers(INPUT_FILE)
+    history = get_already_sent()
+    
+    # 2. Filter out duplicates and previously sent numbers
+    unique_to_send = []
+    seen_in_run = set()
+    for n in raw_list:
+        if n not in history and n not in seen_in_run:
+            unique_to_send.append(n)
+            seen_in_run.add(n)
 
-    for i, num in enumerate(numbers, 1):
-        # 1. Randomize content slightly per recipient
-        custom_msg = get_random_message(message)
+    total = len(unique_to_send)
+    if total == 0:
+        print("No new numbers to process. Session aborted.")
+        return
+
+    print("-" * 40)
+    print(f"Total new numbers: {total}")
+    print(f"Batch Size: {BATCH_SIZE} | Wait: 5m | Break: 60m")
+    print("-" * 40)
+    input("Press Enter to begin sending...")
+
+    for i, num in enumerate(unique_to_send, 1):
+        # Pick a fresh variant and a random greeting for every single person
+        base_body = get_random_message_variant(MESSAGE_FILE)
+        full_msg = f"{random.choice(GREETINGS)}! {base_body}"
         
-        # 2. Open the chat
-        print(f"\n [{i}/{total}] Opening chat for {num}...")
-        success = open_whatsapp_desktop(num, custom_msg)
+        print(f"[{i}/{total}] Opening chat for {num}...")
+        success = open_whatsapp_desktop(num, full_msg)
         
         if success:
-            # 3. Apply randomized delay before moving to next
-            smart_delay()
-            print(f"UI Triggered for {num} — Click 'Send' in the app!")
-        
-        # 4. Batch Cooling Logic
-        if i % BATCH_SIZE == 0 and i < total:
-            print(f"\n BATCH LIMIT ({BATCH_SIZE}) REACHED.")
-            print(f"   Cooling down for {LONG_BREAK_MIN} minutes to protect account trust score...")
-            for minute in range(LONG_BREAK_MIN, 0, -1):
-                print(f" Resuming in {minute}m...", end="\r")
-                time.sleep(60)
-            print("\nCool-down complete. Resuming next batch...")
+            mark_as_sent(num)
+            
+            # Handle Delays
+            if i < total:
+                if i % BATCH_SIZE == 0:
+                    print(f"Batch {i//BATCH_SIZE} done. Waiting {LONG_BREAK_MIN} minutes...")
+                    for m in range(LONG_BREAK_MIN, 0, -1):
+                        print(f"Resuming in {m}m...  ", end="\r")
+                        time.sleep(60)
+                else:
+                    delay = random.uniform(*SHORT_DELAY_RANGE)
+                    print(f"Waiting {delay/60:.2f} minutes before next...")
+                    time.sleep(delay)
 
-    print("\n\n ALL CHATS OPENED!")
-    print("Note: If you receive 0 replies, STOP all activity for 24-48 hours.")
-
-# ──────────────────────────────────────────────────────────────────────────
-# MAIN EXECUTION
-# ──────────────────────────────────────────────────────────────────────────
+    print("\nAll tasks finished. Logged to sent_numbers.txt.")
 
 if __name__ == "__main__":
-    raw_numbers = extract_numbers(INPUT_FILE)
-
-    if not raw_numbers:
-        print(f" Error: No valid numbers found in {INPUT_FILE}")
-        print("Ensure numbers are in international format (e.g., +1234567890)")
-    else:
-        unique_numbers, duplicates = remove_duplicates(raw_numbers)
-
-        print("=" * 55)
-        print("  WhatsApp Smart-Manual Desktop Tool")
-        print("=" * 55)
-        print(f"Unique numbers  : {len(unique_numbers)}")
-        if duplicates:
-            print(f"Duplicates skipped: {len(duplicates)}")
-        print("=" * 55)
-
-        MESSAGE = input("\nType your message body and press ENTER:\n> ").strip()
-
-        if not MESSAGE:
-            print("No message entered. Exiting.")
-        else:
-            save_log(unique_numbers, MESSAGE, OUTPUT_FILE)
-            send_messages_smart(unique_numbers, MESSAGE)
+    run_sender()
